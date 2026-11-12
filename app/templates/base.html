@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf" content="{{ csrf }}">
+  <title>{% block title %}Hulpdashboard{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css?v={{ version }}">
+  <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+  <script src="/static/theme.js?v={{ version }}"></script>
+  <script src="/static/app.js?v={{ version }}" defer></script>
+</head>
+<body>
+{% if active is defined %}
+<header class="top">
+  <a class="brand" href="/">🛟 Hulpdashboard</a>
+  <span class="pill pill-{{ 'ok' if bot.status == 'online' else ('warn' if bot.status == 'verbinden' else 'bad') }}" title="{{ bot.detail }}">
+    bot {{ bot.status }}
+  </span>
+  <nav>
+    <a href="/gesprekken" class="{{ 'on' if active == 'gesprekken' }}">Gesprekken</a>
+    <a href="/geheugen" class="{{ 'on' if active == 'geheugen' }}">Geheugen</a>
+    <a href="/prompt" class="{{ 'on' if active == 'prompt' }}">Systeemprompt</a>
+    <a href="/instellingen" class="{{ 'on' if active == 'instellingen' }}">Instellingen</a>
+    <a href="/status" class="{{ 'on' if active == 'status' }}">Status</a>
+    <button type="button" class="theme-toggle js-theme" title="Wissel tussen automatisch, donker en licht">🌓 Automatisch</button>
+    <form method="post" action="/logout" class="inline">
+      <input type="hidden" name="csrf" value="{{ csrf }}">
+      <button class="link">Uitloggen</button>
+    </form>
+  </nav>
+</header>
+{% endif %}
+<main class="{% block mainclass %}{% endblock %}">
+  {% if flash %}<div class="flash flash-{{ flash[0] }}">{{ flash[1] }}</div>{% endif %}
+  {% if error %}<div class="flash flash-fout">{{ error }}</div>{% endif %}
+  {% block content %}{% endblock %}
+</main>
+<footer class="foot">versie {{ version }}{% if active is not defined %} <button type="button" class="theme-toggle js-theme" title="Wissel tussen automatisch, donker en licht">🌓 Automatisch</button>{% endif %}</footer>
+</body>
+</html>

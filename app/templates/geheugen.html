@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Geheugen · Hulpdashboard{% endblock %}
+{% block content %}
+<h1>Geheugen</h1>
+<p class="muted">Nieuwe feiten: {{ 'direct opslaan' if mode == 'auto' else 'eerst door jou goedkeuren' }} (wijzig bij Instellingen).
+Gebruikt in de prompt: {{ used }} van {{ budget }} tekens{% if used > budget %}. <strong>Te lang: de oudste feiten worden weggelaten.</strong> Voeg feiten samen of verwijder er een paar.{% endif %}</p>
+
+{% if pending %}
+<section class="card">
+  <div class="row between">
+    <h2>Wacht op goedkeuring ({{ pending|length }})</h2>
+    <form method="post" action="/geheugen-alles-goedkeuren"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Alles goedkeuren</button></form>
+  </div>
+  <ul class="facts">
+  {% for f in pending %}
+    <li>
+      <span>{{ f.text }} <small class="muted">· {{ f.created_at|tijd }}</small></span>
+      <span class="row">
+        <form method="post" action="/geheugen/{{ f.id }}/goedkeuren"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="primary">✅ Goedkeuren</button></form>
+        <form method="post" action="/geheugen/{{ f.id }}/afwijzen"><input type="hidden" name="csrf" value="{{ csrf }}"><button>❌ Afwijzen</button></form>
+      </span>
+    </li>
+  {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<section class="card">
+  <h2>Toevoegen</h2>
+  <form method="post" action="/geheugen/toevoegen" class="row">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input name="text" maxlength="300" placeholder="Bijv. Gebruikt een Elgato Wave:3 microfoon" required>
+    <button class="primary">Toevoegen</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Opgeslagen feiten ({{ approved|length }})</h2>
+  {% if not approved %}<p class="muted">Nog niets onthouden.</p>{% endif %}
+  <ol class="facts">
+  {% for f in approved %}
+    <li>
+      <form method="post" action="/geheugen/{{ f.id }}/bewerken" class="row grow">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <input name="text" value="{{ f.text }}" maxlength="300">
+        <button>Opslaan</button>
+      </form>
+      <form method="post" action="/geheugen/{{ f.id }}/verwijderen"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="danger js-confirm" data-confirm="Dit feit verwijderen?">Verwijderen</button></form>
+    </li>
+  {% endfor %}
+  </ol>
+  <p class="muted">Nummering is hetzelfde als bij <code>!geheugen</code> en <code>!vergeet</code> in Discord.</p>
+</section>
+
+{% if rejected %}
+<details class="card">
+  <summary>Afgewezen feiten (laatste {{ rejected|length }})</summary>
+  <ul class="facts">
+  {% for f in rejected %}
+    <li><span class="muted">{{ f.text }}</span>
+      <span class="row">
+        <form method="post" action="/geheugen/{{ f.id }}/goedkeuren"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Toch opslaan</button></form>
+        <form method="post" action="/geheugen/{{ f.id }}/verwijderen"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="danger">Verwijderen</button></form>
+      </span></li>
+  {% endfor %}
+  </ul>
+</details>
+{% endif %}
+{% endblock %}

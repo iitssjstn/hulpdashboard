@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Instellen · Hulpdashboard{% endblock %}
+{% block mainclass %}narrow{% endblock %}
+{% block content %}
+<h1>🛟 Hulpdashboard instellen</h1>
+<ol class="steps">
+  {% for name in steps %}
+  <li class="{{ 'done' if loop.index < step else ('on' if loop.index == step) }}">{{ name }}</li>
+  {% endfor %}
+</ol>
+
+<div class="card">
+{% if step == 1 %}
+  <h2>1. Kies een wachtwoord</h2>
+  <p>Dit is het enige account voor dit dashboard. Kies een sterk wachtwoord van minstens 10 tekens; het wordt alleen als hash opgeslagen.</p>
+  <form method="post" action="/setup/1" class="stack">
+    <label>Wachtwoord <input type="password" name="password" autocomplete="new-password" minlength="10" required autofocus></label>
+    <label>Nog een keer <input type="password" name="confirm" autocomplete="new-password" minlength="10" required></label>
+    <button class="primary">Opslaan en verder</button>
+  </form>
+
+{% elif step == 2 %}
+  <h2>2. Discord-bot-token</h2>
+  <ol class="help">
+    <li>Ga naar <a href="https://discord.com/developers/applications" target="_blank" rel="noopener">discord.com/developers/applications</a> en klik op <em>New Application</em>.</li>
+    <li>Open het tabblad <em>Bot</em>, zet <strong>Message Content Intent</strong> aan en klik <em>Save Changes</em>.</li>
+    <li>Klik op <em>Reset Token</em>, kopieer het token en plak het hieronder.</li>
+    <li>Klik op <em>Test</em>: je krijgt dan ook de link om de bot op je server uit te nodigen.</li>
+  </ol>
+  {% with key="discord_token", label="Discord-bot-token", is_set=has_discord, action="/setup/2", wizard=True %}{% include "_secret.html" %}{% endwith %}
+  {% if has_discord %}<form method="post" action="/setup/2"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="primary" name="action" value="skip">Volgende</button></form>{% endif %}
+
+{% elif step == 3 %}
+  <h2>3. OpenRouter-API-key</h2>
+  <ol class="help">
+    <li>Maak een (gratis) account op <a href="https://openrouter.ai" target="_blank" rel="noopener">openrouter.ai</a>.</li>
+    <li>Ga naar <em>Keys</em> en klik op <em>Create Key</em>. Een limiet van $0 is prima: de bot gebruikt gratis modellen.</li>
+    <li>Plak de key hieronder en klik op <em>Test</em>.</li>
+  </ol>
+  {% with key="openrouter_key", label="OpenRouter-API-key", is_set=has_openrouter, action="/setup/3", wizard=True %}{% include "_secret.html" %}{% endwith %}
+  {% if has_openrouter %}<form method="post" action="/setup/3"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="primary" name="action" value="skip">Volgende</button></form>{% endif %}
+
+{% elif step == 4 %}
+  <h2>4. Server, kanalen en jouw ID</h2>
+  <p>Zet in Discord eerst <em>Gebruikersinstellingen → Geavanceerd → Ontwikkelaarsmodus</em> aan. Daarna kun je met rechts klikken op een server, kanaal of jezelf en <em>ID kopiëren</em> kiezen.</p>
+  <p class="muted">Laat je de kanaal-ID's leeg, dan gebruikt de bot de kanalen met de naam <code>#hulp</code> en <code>#geheugen</code>.</p>
+  <form method="post" action="/setup/4" class="stack">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% include "_ids.html" %}
+    <div class="row">
+      <button class="primary">Opslaan en verder</button>
+      <button name="action" value="skip" class="ghost" formnovalidate>Later invullen</button>
+    </div>
+  </form>
+
+{% elif step == 5 %}
+  <h2>5. Over je vader</h2>
+  <p>Hoe meer je invult, hoe beter de bot helpt. Wat leeg blijft, vraagt de bot zelf aan hem. Je kunt dit later aanpassen bij <em>Systeemprompt</em>.</p>
+  <form method="post" action="/setup/5" class="stack">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    {% include "_profile.html" %}
+    <div class="row">
+      <button class="primary">Opslaan en verder</button>
+      <button name="action" value="skip" class="ghost" formnovalidate>Later invullen</button>
+    </div>
+  </form>
+
+{% else %}
+  <h2>6. Klaar!</h2>
+  <ul class="checklist">
+    <li>{{ '✅' if has_discord else '⚠️' }} Discord-token {{ 'ingesteld' if has_discord else 'nog niet ingesteld' }}</li>
+    <li>{{ '✅' if has_openrouter else '⚠️' }} OpenRouter-key {{ 'ingesteld' if has_openrouter else 'nog niet ingesteld' }}</li>
+    <li>{{ '✅' if s.owner_user_id else '⚠️' }} Jouw user ID {{ 'ingesteld' if s.owner_user_id else 'nog niet ingesteld (nodig om je te taggen)' }}</li>
+    <li>✅ Bot: {{ bot.detail }}</li>
+  </ul>
+  <p>Alles is later te wijzigen bij <em>Instellingen</em>. Laat je vader in het kanaal een vraag stellen om te testen.</p>
+  <form method="post" action="/setup/6"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="primary">Naar het dashboard</button></form>
+{% endif %}
+</div>
+{% if step > 2 %}<p><a href="/setup/{{ step - 1 }}">← Vorige stap</a></p>{% endif %}
+{% endblock %}

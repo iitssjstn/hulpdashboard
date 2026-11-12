@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Inloggen · Hulpdashboard{% endblock %}
+{% block mainclass %}narrow{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>🛟 Hulpdashboard</h1>
+  <form method="post" action="/login" class="stack">
+    <label>Wachtwoord
+      <input type="password" name="password" autocomplete="current-password" required autofocus>
+    </label>
+    <button class="primary">Inloggen</button>
+  </form>
+</div>
+{% endblock %}

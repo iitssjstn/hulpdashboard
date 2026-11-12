@@ -1,0 +1,3 @@
+# Alleen voor tests (lokaal en in CI), NIET in de Docker-image.
+-r requirements.txt
+pytest==9.2.0

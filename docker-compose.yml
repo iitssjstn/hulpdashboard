@@ -1,0 +1,71 @@
+# Hulpdashboard: Discord-hulpbot + webdashboard.
+# Dit bestand werkt zelfstandig: zet alleen dit bestand op je server en draai
+#   docker compose up -d
+# Er staan GEEN geheimen in. Tokens en keys vul je in via het dashboard.
+
+name: hulpdashboard
+
+services:
+  hulpdashboard:
+    image: ghcr.io/iitssjstn/hulpdashboard:latest
+    # Vastzetten op een specifieke versie (zie README → Terugrollen):
+    # image: ghcr.io/iitssjstn/hulpdashboard:abc1234
+    container_name: hulpdashboard
+    restart: unless-stopped
+    environment:
+      TZ: Europe/Amsterdam
+    ports:
+      # Alleen bereikbaar vanaf de server zelf. Zie README voor SSH-tunnel / Tailscale / reverse proxy.
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - hulp-data:/data   # SQLite-database en afbeeldingen
+      - hulp-keys:/keys   # versleutelingssleutel (apart van de database!)
+    healthcheck:
+      test: ["CMD", "python", "-m", "app.healthcheck"]
+      interval: 30s
+      timeout: 6s
+      start_period: 40s
+      retries: 3
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # labels:
+    #   - com.centurylinklabs.watchtower.enable=true   # alleen nodig als je Watchtower hieronder aanzet
+
+  # ---------------------------------------------------------------------------
+  # OPTIONEEL: Watchtower haalt automatisch nieuwe images op. Standaard UIT.
+  # Aanzetten: haal de '#' weg voor dit hele blok én voor de 'labels'-regels hierboven,
+  # en draai daarna 'docker compose up -d'. Zie README → Automatisch updaten.
+  # ---------------------------------------------------------------------------
+  # watchtower:
+  #   image: containrrr/watchtower:1.7.1
+  #   container_name: hulpdashboard-watchtower
+  #   restart: unless-stopped
+  #   environment:
+  #     TZ: Europe/Amsterdam
+  #     WATCHTOWER_LABEL_ENABLE: "true"      # alleen containers met het label hierboven
+  #     WATCHTOWER_CLEANUP: "true"           # oude images opruimen
+  #     WATCHTOWER_SCHEDULE: "0 0 4 * * *"   # elke nacht om 04:00
+  #     DOCKER_API_VERSION: "1.44"           # nodig op Docker 29 en nieuwer
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #     # Privé package? Dan ook je docker-login doorgeven:
+  #     # - /root/.docker/config.json:/config.json:ro
+  #   logging:
+  #     driver: json-file
+  #     options:
+  #       max-size: "5m"
+  #       max-file: "2"
+
+volumes:
+  hulp-data:
+  hulp-keys:

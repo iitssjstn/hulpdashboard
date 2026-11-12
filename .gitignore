@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Lokale data, logs en geheimen: NOOIT committen
+data/
+keys/
+logs/
+*.sqlite3
+*.sqlite3-*
+*.db
+*.key
+secret.key
+*.log
+
+# Lokale config
+.env
+.env.*
+docker-compose.override.yml
+compose.override.yml
+
+# Editors/OS
+.idea/
+.vscode/
+.DS_Store

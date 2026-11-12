@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Instellingen · Hulpdashboard{% endblock %}
+{% block content %}
+<h1>Instellingen</h1>
+
+<form method="post" action="/instellingen/algemeen" class="stack">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+
+  <section class="card">
+    <h2>AI-model</h2>
+    <label>Hoofdmodel
+      <input name="model_primary" value="{{ s.model_primary }}" list="model-list" spellcheck="false"></label>
+    <label>Fallback-modellen <span class="muted">(één per regel; bij een fout of drukte probeert de bot ze op volgorde)</span>
+      <textarea name="model_fallbacks" rows="4" class="mono" spellcheck="false">{{ s.model_fallbacks|join('\n') }}</textarea></label>
+    <datalist id="model-list"></datalist>
+    <div class="row">
+      <button type="button" id="js-models">Actuele gratis vision-modellen ophalen</button>
+    </div>
+    <div id="models-result" class="models" hidden></div>
+    <p class="muted"><code>openrouter/free</code> kiest zelf een gratis model dat afbeeldingen kan lezen; handig als laatste fallback.</p>
+  </section>
+
+  <section class="card">
+    <h2>Discord</h2>
+    {% include "_ids.html" %}
+  </section>
+
+  <section class="card">
+    <h2>Gesprekken en geheugen</h2>
+    <div class="grid2">
+      <label>Aantal onthouden berichten per gebruiker <span class="muted">(vraag + antwoord)</span>
+        <input type="number" name="history_messages" min="0" max="50" value="{{ s.history_messages }}"></label>
+      <label>…maar alleen van de laatste (uur)
+        <input type="number" name="history_hours" min="1" max="720" value="{{ s.history_hours }}"></label>
+      <label>Nieuwe feiten
+        <select name="memory_mode">
+          <option value="review" {{ 'selected' if s.memory_mode == 'review' }}>Eerst door mij laten goedkeuren</option>
+          <option value="auto" {{ 'selected' if s.memory_mode == 'auto' }}>Direct opslaan</option>
+        </select></label>
+      <label>Feiten zoeken na … minuten stilte
+        <input type="number" name="memory_idle_minutes" min="1" max="240" value="{{ s.memory_idle_minutes }}"></label>
+      <label>Maximale lengte geheugen in de prompt (tekens)
+        <input type="number" name="memory_budget_chars" min="200" max="20000" step="100" value="{{ s.memory_budget_chars }}"></label>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Gevoelige onderwerpen</h2>
+    <p class="muted">Bij betalen, bankzaken, wachtwoorden, verdachte berichten en opzeggen geeft de bot geen uitleg maar tagt hij jou. Dat zit ingebouwd. Hier kun je extra woorden toevoegen (één per regel).</p>
+    <textarea name="sensitive_extra" rows="3" placeholder="bijv. belastingdienst">{{ s.sensitive_extra|join('\n') }}</textarea>
+  </section>
+
+  <div class="row sticky-actions"><button class="primary">Instellingen opslaan</button></div>
+</form>
+
+<section class="card">
+  <h2>Geheimen</h2>
+  <p class="muted">Opgeslagen geheimen worden nooit meer getoond. Na het vervangen van het Discord-token verbindt de bot vanzelf opnieuw.</p>
+  {% with key="discord_token", label="Discord-bot-token", is_set=has_discord, action="/instellingen/geheim/discord_token", wizard=False %}{% include "_secret.html" %}{% endwith %}
+  {% with key="openrouter_key", label="OpenRouter-API-key", is_set=has_openrouter, action="/instellingen/geheim/openrouter_key", wizard=False %}{% include "_secret.html" %}{% endwith %}
+</section>
+
+<section class="card">
+  <h2>Wachtwoord wijzigen</h2>
+  <form method="post" action="/instellingen/wachtwoord" class="stack">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <label>Huidig wachtwoord <input type="password" name="current" autocomplete="current-password" required></label>
+    <label>Nieuw wachtwoord <input type="password" name="password" autocomplete="new-password" minlength="10" required></label>
+    <label>Nieuw wachtwoord (nog een keer) <input type="password" name="confirm" autocomplete="new-password" minlength="10" required></label>
+    <div class="row"><button class="primary">Wachtwoord wijzigen</button></div>
+  </form>
+</section>
+
+<section class="card">
+  <h2>De setup-wizard opnieuw doorlopen</h2>
+  <p><a href="/setup/2">Wizard openen</a> <span class="muted">(je huidige instellingen blijven staan)</span></p>
+</section>
+{% endblock %}

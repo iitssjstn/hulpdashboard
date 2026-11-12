@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Systeemprompt · Hulpdashboard{% endblock %}
+{% block content %}
+<h1>Systeemprompt</h1>
+<form method="post" action="/prompt" class="stack">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <section class="card">
+    <h2>Zijn situatie</h2>
+    <p class="muted">Lege velden vraagt de bot zelf aan hem, in plaats van te gokken. Wijzigingen werken direct.</p>
+    {% include "_profile.html" %}
+  </section>
+  <section class="card">
+    <div class="row between">
+      <h2>Basisinstructies {% if is_default %}<span class="pill">standaard</span>{% else %}<span class="pill pill-warn">aangepast</span>{% endif %}</h2>
+    </div>
+    <p class="muted">Je kunt <code>{{ '{{naam}}' }}</code>, <code>{{ '{{aanspreekvorm}}' }}</code>, <code>{{ '{{taal_pc}}' }}</code> en <code>{{ '{{eigenaar}}' }}</code> gebruiken. Laat de regel met <code>[[DOORVERWIJZEN]]</code> staan: daarmee tagt de bot jou bij gevoelige onderwerpen.</p>
+    <textarea name="base_prompt" rows="22" class="mono">{{ base }}</textarea>
+  </section>
+  <div class="row sticky-actions"><button class="primary">Opslaan</button></div>
+</form>
+{% if not is_default %}
+<form method="post" action="/prompt/standaard" class="row">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <button class="danger js-confirm" data-confirm="Je eigen basisinstructies vervangen door de standaardtekst?">Standaardtekst terugzetten</button>
+</form>
+{% endif %}
+<details class="card">
+  <summary>Voorbeeld: zo ziet de volledige prompt er nu uit</summary>
+  <pre class="preview">{{ preview }}</pre>
+</details>
+{% endblock %}

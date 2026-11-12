@@ -1,0 +1,6 @@
+# Alleen wat de image nodig heeft
+*
+!requirements.txt
+!app/
+app/**/__pycache__
+app/**/*.pyc

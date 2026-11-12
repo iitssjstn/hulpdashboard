@@ -1,0 +1,23 @@
+<div class="grid2">
+{% for key, label, hint in fields %}
+  {% if key == 'taal_pc' %}
+  <label>{{ label }}
+    <select name="taal_pc">
+      {% for opt in ['Nederlands', 'Engels'] %}<option {{ 'selected' if profile.taal_pc == opt }}>{{ opt }}</option>{% endfor %}
+      {% if profile.taal_pc not in ['Nederlands', 'Engels', ''] %}<option selected>{{ profile.taal_pc }}</option>{% endif %}
+    </select>
+    <span class="muted">{{ hint }}</span></label>
+  {% elif key == 'aanspreekvorm' %}
+  <label>{{ label }}
+    <select name="aanspreekvorm">
+      {% for opt in ['je', 'u'] %}<option {{ 'selected' if profile.aanspreekvorm == opt }}>{{ opt }}</option>{% endfor %}
+    </select></label>
+  {% elif key in ['obs', 'streamelements', 'overig', 'streamingdiensten'] %}
+  <label class="wide">{{ label }}
+    <textarea name="{{ key }}" rows="3" placeholder="{{ hint }}">{{ profile[key] }}</textarea></label>
+  {% else %}
+  <label>{{ label }}
+    <input name="{{ key }}" value="{{ profile[key] }}" placeholder="{{ hint }}"></label>
+  {% endif %}
+{% endfor %}
+</div>

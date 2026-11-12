@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Status · Hulpdashboard{% endblock %}
+{% block content %}
+<h1>Status en logs</h1>
+<div class="tiles">
+  <div class="card tile">
+    <span class="muted">Discord-bot</span>
+    <strong class="big pill-text-{{ 'ok' if bot.status == 'online' else ('warn' if bot.status == 'verbinden' else 'bad') }}">{{ bot.status }}</strong>
+    <span>{{ bot.detail }}</span>
+    <span class="muted">sinds {{ bot.since|epoch }}{% if bot.latency_ms %} · {{ bot.latency_ms }} ms{% endif %}</span>
+    {% if bot.guilds %}<span class="muted">servers: {{ bot.guilds|join(', ') }}</span>{% endif %}
+    <form method="post" action="/bot/herverbinden"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Opnieuw verbinden</button></form>
+  </div>
+  <div class="card tile">
+    <span class="muted">Versie (git-commit)</span>
+    <strong class="big mono">{{ version }}</strong>
+    <span>Discord-token: {{ 'ingesteld ✓' if has_discord else 'ontbreekt' }}</span>
+    <span>OpenRouter-key: {{ 'ingesteld ✓' if has_openrouter else 'ontbreekt' }}</span>
+  </div>
+  <div class="card tile">
+    <span class="muted">Totaal</span>
+    <strong class="big">{{ counts.gesprekken }}</strong>
+    <span>gesprekken · {{ counts.feiten }} feiten · {{ counts.wachtend }} wachtend</span>
+    <span class="muted">Modelvolgorde: {{ models|join(' → ') }}</span>
+  </div>
+</div>
+
+<section class="card">
+  <h2>Welk model antwoordde (laatste 7 dagen)</h2>
+  {% if usage %}
+  <table><thead><tr><th>Model</th><th>Status</th><th>Aantal</th></tr></thead><tbody>
+  {% for u in usage %}<tr><td class="mono">{{ u.model }}</td><td>{{ u.status }}</td><td>{{ u.n }}</td></tr>{% endfor %}
+  </tbody></table>
+  {% else %}<p class="muted">Nog geen gesprekken.</p>{% endif %}
+</section>
+
+<section class="card">
+  <h2>Laatste antwoorden</h2>
+  <table><thead><tr><th>Tijd</th><th>Wie</th><th>Model</th><th>Status</th></tr></thead><tbody>
+  {% for r in last %}<tr class="status-{{ r.status }}"><td>{{ r.created_at|tijd }}</td><td>{{ r.user_name }}</td><td class="mono">{{ r.model or '-' }}</td><td>{{ r.status }}{% if r.error %} <details class="err"><summary>details</summary><pre>{{ r.error }}</pre></details>{% endif %}</td></tr>{% endfor %}
+  </tbody></table>
+</section>
+
+<section class="card">
+  <h2>Laatste waarschuwingen en fouten</h2>
+  {% if logs %}
+  <table class="logs"><thead><tr><th>Tijd</th><th>Niveau</th><th>Bron</th><th>Melding</th></tr></thead><tbody>
+  {% for l in logs %}<tr class="lvl-{{ l.level|lower }}"><td>{{ l.created_at|tijd }}</td><td>{{ l.level }}</td><td class="mono">{{ l.source }}</td><td>{{ l.message }}</td></tr>{% endfor %}
+  </tbody></table>
+  {% else %}<p class="muted">Geen fouten. 🎉</p>{% endif %}
+  <p class="muted">Volledige logs: <code>docker compose logs -f hulpdashboard</code></p>
+</section>
+{% endblock %}

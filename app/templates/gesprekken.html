@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Gesprekken · Hulpdashboard{% endblock %}
+{% block content %}
+<h1>Gesprekken</h1>
+<form method="get" action="/gesprekken" class="row search">
+  <input type="search" name="q" value="{{ q }}" placeholder="Zoek in vragen en antwoorden…">
+  <button>Zoeken</button>
+  {% if q %}<a href="/gesprekken" class="ghost btn">Wissen</a>{% endif %}
+</form>
+<p class="muted">{{ total }} gesprek{{ 'ken' if total != 1 }}{% if q %} gevonden voor “{{ q }}”{% endif %}</p>
+
+{% for r in rows %}
+<article class="card convo status-{{ r.status }}">
+  <div class="meta">
+    <span>{{ r.created_at|tijd }}</span>
+    <span>· {{ r.user_name }}</span>
+    {% if r.status == 'doorverwezen' %}<span class="pill pill-warn">doorverwezen naar jou</span>{% endif %}
+    {% if r.status == 'fout' %}<span class="pill pill-bad">fout</span>{% endif %}
+    {% if r.status == 'commando' %}<span class="pill">commando</span>{% endif %}
+    {% if r.model %}<span class="pill pill-model">{{ r.model }}</span>{% endif %}
+  </div>
+  <div class="q"><strong>Vraag</strong><p>{{ r.question or '(alleen afbeelding)' }}</p></div>
+  {% set imgs = r.images|fromjson %}
+  {% if imgs %}
+  <div class="thumbs">
+    {% for img in imgs %}<a href="/afbeeldingen/{{ img }}" target="_blank"><img src="/afbeeldingen/{{ img }}" alt="afbeelding" loading="lazy"></a>{% endfor %}
+  </div>
+  {% endif %}
+  <div class="a"><strong>Antwoord</strong><p>{{ r.answer }}</p></div>
+  {% if r.error %}<details class="err"><summary>Technische details</summary><pre>{{ r.error }}</pre></details>{% endif %}
+</article>
+{% else %}
+<div class="card muted">Nog geen gesprekken{% if q %} gevonden{% endif %}.</div>
+{% endfor %}
+
+{% if pages > 1 %}
+<nav class="pager">
+  {% if page > 1 %}<a href="?q={{ q|urlencode }}&page={{ page - 1 }}">← Nieuwer</a>{% endif %}
+  <span>pagina {{ page }} van {{ pages }}</span>
+  {% if page < pages %}<a href="?q={{ q|urlencode }}&page={{ page + 1 }}">Ouder →</a>{% endif %}
+</nav>
+{% endif %}
+{% endblock %}
