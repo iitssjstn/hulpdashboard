@@ -97,8 +97,35 @@ docker compose ps
 Open nu het dashboard (zie [Toegang tot het dashboard](#toegang-tot-het-dashboard)) en doorloop de
 setup-wizard. Er is geen `.env`-bestand en je hoeft verder niets op de server te configureren.
 
-> **Let op:** wie het dashboard als eerste opent, mag het wachtwoord kiezen. Daarom luistert de poort
-> standaard alleen op `127.0.0.1`. Doorloop de wizard meteen na de eerste start.
+### De setupcode
+
+Om te voorkomen dat een vreemde die je dashboard-URL vindt als eerste een wachtwoord kiest, vraagt de
+wizard bij de eerste keer om een **eenmalige setupcode**. Die staat in de logs van de container:
+
+```bash
+docker compose logs hulpdashboard
+```
+
+Zoek naar dit blok en neem de code over (hoofdletters en streepjes maken niet uit):
+
+```
+============================================================
+  EERSTE KEER INSTELLEN
+  Open het dashboard en vul deze setupcode in:
+
+      LH3Y-6CG6-Z4V8
+
+  (De code is alleen geldig tot je een wachtwoord hebt gekozen.)
+============================================================
+```
+
+- De code staat alleen in het geheugen van de container: niet in de database, niet op de website.
+- Na elke herstart van de container is er een nieuwe code, zolang er nog geen wachtwoord is.
+- Na het kiezen van je wachtwoord vervalt de code en verschijnt hij niet meer.
+- Raden heeft geen zin: na 5 foute pogingen wordt het IP-adres geblokkeerd (12 tekens, ±60 bits).
+
+Zo kun je de wizard meteen via je reverse proxy (bijv. Nginx Proxy Manager) doorlopen; een
+SSH-tunnel is niet nodig.
 
 ---
 
@@ -181,7 +208,8 @@ lezen, en met één klik zet je er een als hoofd- of fallbackmodel.
 
 Bij de eerste keer openen loop je deze stappen door (je kunt stappen overslaan en later invullen):
 
-1. **Wachtwoord:** minstens 10 tekens, opgeslagen als scrypt-hash.
+1. **Setupcode + wachtwoord:** de code uit de containerlogs (zie [De setupcode](#de-setupcode)) en een
+   wachtwoord van minstens 10 tekens, opgeslagen als scrypt-hash.
 2. **Discord-bot-token** + Test-knop (controleert ook of de Message Content Intent aanstaat).
 3. **OpenRouter-API-key** + Test-knop.
 4. **Server-ID, kanaal-ID's** (`#hulp`, `#geheugen`) en **jouw user ID** (zodat de bot jou kan taggen).
@@ -221,10 +249,20 @@ sudo tailscale serve --bg 8080
 Het dashboard staat dan op `https://<servernaam>.<jouw-tailnet>.ts.net`, met HTTPS en alleen
 bereikbaar voor jouw apparaten. De compose-file hoeft niet te veranderen.
 
+### Nginx Proxy Manager (in dezelfde compose-stack)
+
+Draait Nginx Proxy Manager in dezelfde compose-file als het dashboard, dan kan hij de container direct
+op naam bereiken. Maak een **Proxy Host** aan:
+
+- Forward Hostname: `hulpdashboard`, Forward Port: `8080`, Scheme: `http`
+- Tabblad **SSL**: Let's Encrypt-certificaat aanvragen en **Force SSL** aanzetten
+
+Het `ports:`-blok van het dashboard kun je dan weglaten (of laten staan voor noodtoegang via een
+SSH-tunnel). Overweeg een **Access List** in Nginx Proxy Manager voor extra bescherming.
+
 ### Reverse proxy met HTTPS (vanaf internet)
 
-Alleen doen als je het dashboard echt publiek wilt hebben. Voorbeeld met Caddy op de host (regelt
-zelf een Let's Encrypt-certificaat):
+Voorbeeld met Caddy op de host (regelt zelf een Let's Encrypt-certificaat):
 
 ```
 hulp.jouwdomein.nl {
@@ -316,6 +354,8 @@ Aandachtspunten:
   in een **apart volume** (`hulp-keys`), los van de database (`hulp-data`).
 - Opgeslagen geheimen worden **nooit meer getoond**, alleen "ingesteld ✓" met een knop om te vervangen.
 - Het dashboardwachtwoord wordt opgeslagen als **scrypt-hash** (met salt).
+- Het **eerste wachtwoord** kan alleen worden gekozen met de eenmalige setupcode uit de containerlogs.
+  Wie geen toegang tot je server heeft, kan het dashboard dus niet "claimen" voordat jij dat doet.
 - **Login-ratelimiting:** na 5 foute pogingen binnen 15 minuten is een IP 15 minuten geblokkeerd, en
   daarna steeds langer (tot 24 uur). Na 20 foute pogingen in totaal binnen 15 minuten gaat inloggen voor
   iedereen 15 minuten dicht.

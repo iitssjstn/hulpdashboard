@@ -43,11 +43,22 @@ def init_storage() -> None:
     crypto.init()
 
 
+def announce_setup_code() -> None:
+    code = auth.ensure_setup_code()
+    if code:
+        # Alleen naar stdout (INFO komt niet in de database), zodat hij in 'docker compose logs' staat.
+        line = "=" * 60
+        log.info("\n%s\n  EERSTE KEER INSTELLEN\n  Open het dashboard en vul deze setupcode in:\n\n"
+                 "      %s\n\n  (De code is alleen geldig tot je een wachtwoord hebt gekozen.)\n%s",
+                 line, code, line)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logsetup.setup()
     init_storage()
     log.info("Hulpdashboard versie %s gestart", paths.VERSION)
+    announce_setup_code()
     await manager.start()
     try:
         yield
@@ -232,15 +243,28 @@ async def setup_start(request: Request):
 
 
 @app.post("/setup/1")
-async def setup_password(request: Request, password: str = Form(""), confirm: str = Form("")):
+async def setup_password(request: Request, code: str = Form(""), password: str = Form(""),
+                         confirm: str = Form("")):
     if auth.has_password():
         raise HTTPException(403, "Er is al een wachtwoord ingesteld.")
     if not same_origin(request):
         raise HTTPException(403, "Ongeldig formulier.")
+    ip = client_ip(request)
+    wait = auth.limiter.check(ip)
+    if wait:
+        return render(request, "setup.html", step=1, steps=SETUP_STEPS,
+                      error=f"Te veel pogingen. Probeer het over {max(1, wait // 60)} minuten opnieuw.")
+    if not auth.check_setup_code(code):
+        auth.limiter.fail(ip)
+        log.warning("Verkeerde setupcode ingevuld vanaf %s", ip)
+        return render(request, "setup.html", step=1, steps=SETUP_STEPS,
+                      error="Die setupcode klopt niet. Kijk in de logs van de container (zie uitleg).")
     problem = auth.password_problem(password, confirm)
     if problem:
         return render(request, "setup.html", step=1, steps=SETUP_STEPS, error=problem)
     settings.set("password_hash", auth.hash_password(password))
+    auth.limiter.success(ip)
+    auth.ensure_setup_code()  # code vervalt
     settings.set("setup_step", 2)
     log.info("Dashboardwachtwoord ingesteld")
     return login_response(request, "/setup/2")

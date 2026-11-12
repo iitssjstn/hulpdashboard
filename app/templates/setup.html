@@ -13,8 +13,12 @@
 {% if step == 1 %}
   <h2>1. Kies een wachtwoord</h2>
   <p>Dit is het enige account voor dit dashboard. Kies een sterk wachtwoord van minstens 10 tekens; het wordt alleen als hash opgeslagen.</p>
+  <p>Om te bewijzen dat jij de eigenaar van de server bent, vul je eerst de <strong>setupcode</strong> in. Die staat in de logs van de container. Typ op je server, in de map met je compose-file:</p>
+  <pre class="preview">docker compose logs hulpdashboard</pre>
+  <p class="muted">Zoek naar "EERSTE KEER INSTELLEN". De code is na elke herstart van de container nieuw.</p>
   <form method="post" action="/setup/1" class="stack">
-    <label>Wachtwoord <input type="password" name="password" autocomplete="new-password" minlength="10" required autofocus></label>
+    <label>Setupcode <input name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="XXXX-XXXX-XXXX" required autofocus></label>
+    <label>Wachtwoord <input type="password" name="password" autocomplete="new-password" minlength="10" required></label>
     <label>Nog een keer <input type="password" name="confirm" autocomplete="new-password" minlength="10" required></label>
     <button class="primary">Opslaan en verder</button>
   </form>

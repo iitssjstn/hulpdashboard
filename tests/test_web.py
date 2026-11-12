@@ -12,6 +12,7 @@ PW = "een-lang-wachtwoord"
 @pytest.fixture
 def client():
     auth.limiter.__init__()
+    auth.setup_code = None
     with TestClient(app, base_url="http://testserver") as c:
         yield c
 
@@ -21,7 +22,7 @@ def csrf_of(html: str) -> str:
 
 
 def do_setup(c, finish=True):
-    r = c.post("/setup/1", data={"password": PW, "confirm": PW}, follow_redirects=False)
+    r = c.post("/setup/1", data={"code": auth.setup_code, "password": PW, "confirm": PW}, follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == "/setup/2"
     page = c.get("/setup/2").text
     token = csrf_of(page)
@@ -44,9 +45,9 @@ def test_first_visit_goes_to_setup(client):
 
 
 def test_setup_password_validation(client):
-    r = client.post("/setup/1", data={"password": "kort", "confirm": "kort"})
+    r = client.post("/setup/1", data={"code": auth.setup_code, "password": "kort", "confirm": "kort"})
     assert "minstens 10" in r.text
-    r = client.post("/setup/1", data={"password": PW, "confirm": PW + "x"})
+    r = client.post("/setup/1", data={"code": auth.setup_code, "password": PW, "confirm": PW + "x"})
     assert "niet hetzelfde" in r.text
     assert not auth.has_password()
 
@@ -54,7 +55,7 @@ def test_setup_password_validation(client):
 def test_setup_password_only_once(client):
     do_setup(client)
     client.cookies.clear()
-    r = client.post("/setup/1", data={"password": "nog-een-wachtwoord", "confirm": "nog-een-wachtwoord"})
+    r = client.post("/setup/1", data={"code": auth.setup_code, "password": "nog-een-wachtwoord", "confirm": "nog-een-wachtwoord"})
     assert r.status_code == 403
     assert auth.verify_password(PW, settings.get("password_hash"))
 
@@ -209,7 +210,7 @@ def test_security_headers(client):
 
 def test_login_accepts_same_origin_header(client):
     # Browsers sturen Origin mee bij een POST; die moet geaccepteerd worden.
-    r = client.post("/setup/1", data={"password": PW, "confirm": PW},
+    r = client.post("/setup/1", data={"code": auth.setup_code, "password": PW, "confirm": PW},
                     headers={"Origin": "http://testserver"}, follow_redirects=False)
     assert r.status_code == 303
     client.cookies.clear()
@@ -222,3 +223,36 @@ def test_login_accepts_same_origin_header(client):
 
 def test_referrer_policy_keeps_origin(client):
     assert client.get("/setup").headers["referrer-policy"] == "same-origin"
+
+
+def test_setup_code_required(client):
+    code = auth.setup_code
+    assert code and len(code) == 14  # XXXX-XXXX-XXXX
+    r = client.post("/setup/1", data={"code": "", "password": PW, "confirm": PW})
+    assert "setupcode klopt niet" in r.text and not auth.has_password()
+    r = client.post("/setup/1", data={"code": "AAAA-BBBB-CCCC", "password": PW, "confirm": PW})
+    assert "setupcode klopt niet" in r.text and not auth.has_password()
+    # Hoofdletters/streepjes/spaties maken niet uit.
+    r = client.post("/setup/1", data={"code": " " + code.replace("-", "").lower() + " ", "password": PW,
+                                      "confirm": PW}, follow_redirects=False)
+    assert r.status_code == 303 and auth.has_password()
+    assert auth.setup_code is None  # code is vervallen
+
+
+def test_setup_code_guessing_is_rate_limited(client):
+    for _ in range(5):
+        client.post("/setup/1", data={"code": "fout", "password": PW, "confirm": PW})
+    r = client.post("/setup/1", data={"code": auth.setup_code, "password": PW, "confirm": PW})
+    assert "Te veel pogingen" in r.text and not auth.has_password()
+
+
+def test_setup_code_not_in_database_or_page(client):
+    code = auth.setup_code
+    assert code not in client.get("/setup").text
+    assert db.query_one("SELECT COUNT(*) n FROM logs WHERE message LIKE ?", (f"%{code}%",))["n"] == 0
+    assert db.query_one("SELECT COUNT(*) n FROM settings WHERE value LIKE ?", (f"%{code}%",))["n"] == 0
+
+
+def test_no_setup_code_when_password_exists(client):
+    do_setup(client)
+    assert auth.ensure_setup_code() is None

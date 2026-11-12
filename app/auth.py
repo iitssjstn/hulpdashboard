@@ -52,6 +52,36 @@ def has_password() -> bool:
     return bool(settings.get("password_hash"))
 
 
+# ---------- eenmalige setupcode ----------
+# Zolang er nog geen wachtwoord is, mag alleen wie de code uit de containerlogs kent er een kiezen.
+# De code staat alleen in het geheugen (niet in de database) en is na elke herstart nieuw.
+
+_SETUP_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # zonder 0/O en 1/I
+setup_code: str | None = None
+
+
+def normalize_code(code: str) -> str:
+    return "".join(ch for ch in (code or "").upper() if ch.isalnum())
+
+
+def ensure_setup_code() -> str | None:
+    """Maak een setupcode aan als er nog geen wachtwoord is (anders None)."""
+    global setup_code
+    if has_password():
+        setup_code = None
+        return None
+    if setup_code is None:
+        raw = "".join(secrets.choice(_SETUP_ALPHABET) for _ in range(12))
+        setup_code = "-".join(raw[i:i + 4] for i in range(0, 12, 4))
+    return setup_code
+
+
+def check_setup_code(code: str) -> bool:
+    if setup_code is None:
+        return False
+    return hmac.compare_digest(normalize_code(code), normalize_code(setup_code))
+
+
 # ---------- sessies ----------
 
 def _hash_token(token: str) -> str:
