@@ -55,6 +55,10 @@ DEFAULTS: dict[str, Any] = {
     "memory_idle_minutes": 10,
     "memory_budget_chars": 2500,
     "sensitive_extra": [],
+    "ticket_mode": "openbaar",  # 'uit', 'openbaar' (draadje) of 'prive' (privé-draadje)
+    "ticket_followup_minutes": 15,  # bericht in #hulp binnen deze tijd = vervolg op open ticket
+    "ticket_ai_titles": True,
+    "owner_channel_id": "",  # privékanaal voor meldingen aan de eigenaar (leeg = zelf aanmaken)
     "profile": DEFAULT_PROFILE,
     "base_prompt": None,  # None = standaardprompt uit prompt.py
 }

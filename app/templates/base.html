@@ -18,6 +18,7 @@
     bot {{ bot.status }}
   </span>
   <nav>
+    <a href="/tickets" class="{{ 'on' if active == 'tickets' }}">Tickets{% if waiting %} <span class="badge" title="Wacht op jou">{{ waiting }}</span>{% endif %}</a>
     <a href="/gesprekken" class="{{ 'on' if active == 'gesprekken' }}">Gesprekken</a>
     <a href="/geheugen" class="{{ 'on' if active == 'geheugen' }}">Geheugen</a>
     <a href="/prompt" class="{{ 'on' if active == 'prompt' }}">Systeemprompt</a>

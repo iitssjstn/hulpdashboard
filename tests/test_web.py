@@ -256,3 +256,69 @@ def test_setup_code_not_in_database_or_page(client):
 def test_no_setup_code_when_password_exists(client):
     do_setup(client)
     assert auth.ensure_setup_code() is None
+
+
+def _make_ticket(title, status="open", summary=None):
+    from app import core, tickets
+    tid = tickets.create("5", "Pa", "9", str(100 + len(title)), title)
+    if status != "open":
+        tickets.set_status(tid, status)
+    if summary:
+        tickets.set_escalation(tid, "Gevoelig onderwerp: betalen", summary, "77", "88")
+        tickets.set_status(tid, "wacht_op_jou")
+    core._store("5", "Pa", "9", f"vraag over {title}", "antwoord", [], "m", "ok", ticket_id=tid)
+    return tid
+
+
+def test_tickets_pages(client):
+    token = do_setup(client)
+    assert client.get("/", follow_redirects=False).headers["location"] == "/tickets"
+    a = _make_ticket("Tv geeft geen geluid")
+    b = _make_ticket("OBS camera zwart", summary="Pa krijgt een betaalverzoek.")
+    c = _make_ticket("Wifi traag", status="opgelost")
+
+    html = client.get("/tickets").text
+    assert "Tv geeft geen geluid" in html and "OBS camera zwart" in html and "Wifi traag" not in html
+    assert html.index("OBS camera zwart") < html.index("Tv geeft geen geluid")  # wacht op jou bovenaan
+    assert 'class="badge"' in html  # teller in het menu
+    assert "Wifi traag" in client.get("/tickets?status=opgelost").text
+    assert "OBS" not in client.get("/tickets?status=alle&q=geluid").text
+
+    detail = client.get(f"/tickets/{b}").text
+    assert "Samenvatting voor jou" in detail and "Pa krijgt een betaalverzoek." in detail
+    assert "discord.com/channels/9/" in detail and "vraag over OBS camera zwart" in detail
+    assert client.get("/tickets/9999").status_code == 404
+
+    client.post(f"/tickets/{a}/sluiten", data={"csrf": token})
+    from app import tickets
+    assert tickets.get(a)["status"] == "opgelost"
+    client.post(f"/tickets/{c}/heropenen", data={"csrf": token})
+    assert tickets.get(c)["status"] == "open"
+    assert client.post(f"/tickets/{a}/sluiten", data={"csrf": "fout"}).status_code == 403
+
+    conv = client.get("/gesprekken").text
+    assert f'href="/tickets/{a}"' in conv
+
+
+def test_ticket_settings(client):
+    token = do_setup(client)
+    client.post("/instellingen/algemeen", data={"csrf": token, "ticket_mode": "prive",
+                                                "ticket_followup_minutes": "30", "owner_channel_id": "123"})
+    assert settings.get("ticket_mode") == "prive"
+    assert settings.get("ticket_followup_minutes") == 30
+    assert settings.get("ticket_ai_titles") is False  # vinkje uit
+    assert settings.get("owner_channel_id") == "123"
+    assert client.get("/", follow_redirects=False).headers["location"] == "/tickets"
+    client.post("/instellingen/algemeen", data={"csrf": token, "ticket_mode": "uit", "ticket_ai_titles": "1"})
+    assert settings.get("ticket_ai_titles") is True
+    assert client.get("/", follow_redirects=False).headers["location"] == "/gesprekken"
+
+
+def test_mentions_are_readable(client):
+    do_setup(client)
+    settings.set("owner_user_id", "321")
+    settings.set("profile", {"eigenaar_naam": "Sjors"})
+    from app import core
+    core._store("5", "Pa", "9", "vraag", "<@321> kun je hier even naar kijken? <@999>", [], None, "doorverwezen")
+    html = client.get("/gesprekken").text
+    assert "@Sjors kun je hier even naar kijken? @iemand" in html and "&lt;@321&gt;" not in html

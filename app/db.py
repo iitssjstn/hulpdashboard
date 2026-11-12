@@ -55,6 +55,23 @@ CREATE TABLE IF NOT EXISTS logs (
     source     TEXT NOT NULL,
     message    TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS tickets (
+    id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at            TEXT NOT NULL,
+    updated_at            TEXT NOT NULL,
+    user_id               TEXT NOT NULL,
+    user_name             TEXT NOT NULL,
+    guild_id              TEXT,
+    thread_id             TEXT UNIQUE,
+    title                 TEXT NOT NULL,
+    status                TEXT NOT NULL DEFAULT 'open',
+    closed_at             TEXT,
+    summary               TEXT,
+    escalation_reason     TEXT,
+    escalation_channel_id TEXT,
+    escalation_message_id TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_tickets_status ON tickets(status, updated_at);
 CREATE TABLE IF NOT EXISTS sessions (
     token_hash TEXT PRIMARY KEY,
     csrf       TEXT NOT NULL,
@@ -78,10 +95,19 @@ def init(db_path: Path | None = None) -> None:
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
     conn.executescript(SCHEMA)
+    _migrate(conn)
     with _lock:
         if _conn is not None:
             _conn.close()
         _conn = conn
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Kolommen toevoegen aan bestaande databases (alleen uitbreiden, nooit afbreken)."""
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(conversations)")}
+    if "ticket_id" not in cols:
+        conn.execute("ALTER TABLE conversations ADD COLUMN ticket_id INTEGER")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_conv_ticket ON conversations(ticket_id, id)")
 
 
 def conn() -> sqlite3.Connection:

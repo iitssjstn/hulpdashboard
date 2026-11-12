@@ -15,7 +15,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Redirect
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import ai, auth, crypto, db, discord_check, logsetup, memory, paths, prompt, settings
+from . import ai, auth, crypto, db, discord_check, logsetup, memory, paths, prompt, settings, tickets
 from .bot import manager
 
 log = logging.getLogger(__name__)
@@ -25,6 +25,8 @@ PAGE_SIZE = 30
 SETUP_STEPS = ["Wachtwoord", "Discord-bot", "OpenRouter", "Server & kanalen", "Over je vader", "Klaar"]
 
 MESSAGES = {
+    "gesloten": ("ok", "Ticket afgesloten ✓"),
+    "heropend": ("ok", "Ticket weer geopend ✓"),
     "opgeslagen": ("ok", "Opgeslagen ✓"),
     "wachtwoord": ("ok", "Je wachtwoord is gewijzigd ✓ Andere apparaten zijn uitgelogd."),
     "geheim": ("ok", "Opgeslagen ✓ De bot gebruikt het nieuwe geheim direct."),
@@ -90,6 +92,16 @@ templates.env.filters["tijd"] = fmt_time
 templates.env.filters["epoch"] = fmt_epoch
 templates.env.filters["fromjson"] = lambda v: db.get_json(v, [])
 templates.env.globals["version"] = paths.VERSION
+
+
+def fmt_mentions(text: str | None) -> str:
+    """Discord-mentions (<@123>) leesbaar maken in het dashboard."""
+    owner = str(settings.get("owner_user_id") or "")
+    name = (settings.get("profile").get("eigenaar_naam") or "jij").strip() or "jij"
+    return re.sub(r"<@!?(\d+)>", lambda m: f"@{name}" if m.group(1) == owner else "@iemand", text or "")
+
+
+templates.env.filters["mentions"] = fmt_mentions
 
 
 # ---------- beveiliging ----------
@@ -182,6 +194,8 @@ def render(request: Request, name: str, **ctx) -> HTMLResponse:
     ctx.setdefault("flash", msg)
     ctx.setdefault("csrf", getattr(request.state, "csrf", ""))
     ctx.setdefault("bot", manager.info())
+    if ctx.get("active"):
+        ctx.setdefault("waiting", tickets.counts().get("wacht_op_jou", 0))
     return templates.TemplateResponse(request, name, ctx)
 
 
@@ -323,6 +337,7 @@ ID_FIELDS = {
     "help_channel_id": "Kanaal-ID #hulp",
     "memory_channel_id": "Kanaal-ID #geheugen",
     "owner_user_id": "Jouw user ID",
+    "owner_channel_id": "Kanaal-ID meldingen",
 }
 
 
@@ -351,7 +366,7 @@ def save_profile(form) -> None:
 @app.get("/")
 async def home(request: Request):
     require_ready(request)
-    return RedirectResponse("/gesprekken", 303)
+    return RedirectResponse("/tickets" if tickets.enabled() else "/gesprekken", 303)
 
 
 @app.get("/gesprekken", response_class=HTMLResponse)
@@ -369,6 +384,66 @@ async def gesprekken(request: Request, q: str = "", page: int = 1):
     pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
     return render(request, "gesprekken.html", rows=rows, q=q, page=page, pages=pages, total=total,
                   active="gesprekken")
+
+
+# ----- tickets -----
+
+TICKET_FILTERS = {"open": ("open", "wacht_op_jou"), "wacht_op_jou": ("wacht_op_jou",), "opgelost": ("opgelost",),
+                  "alle": ("open", "wacht_op_jou", "opgelost")}
+
+
+@app.get("/tickets", response_class=HTMLResponse)
+async def tickets_page(request: Request, status: str = "open", q: str = "", page: int = 1):
+    require_ready(request)
+    statuses = TICKET_FILTERS.get(status, TICKET_FILTERS["open"])
+    page = max(1, page)
+    where = f"WHERE t.status IN ({','.join('?' * len(statuses))})"
+    params: list = list(statuses)
+    if q.strip():
+        like = f"%{q.strip()}%"
+        where += (" AND (t.title LIKE ? OR t.summary LIKE ? OR EXISTS (SELECT 1 FROM conversations c "
+                  "WHERE c.ticket_id=t.id AND (c.question LIKE ? OR c.answer LIKE ?)))")
+        params += [like, like, like, like]
+    total = db.query_one(f"SELECT COUNT(*) AS n FROM tickets t {where}", tuple(params))["n"]
+    rows = db.query(
+        f"SELECT t.*, (SELECT COUNT(*) FROM conversations c WHERE c.ticket_id=t.id) AS n_msgs, "
+        f"(SELECT question FROM conversations c WHERE c.ticket_id=t.id ORDER BY id LIMIT 1) AS first_q "
+        f"FROM tickets t {where} ORDER BY CASE t.status WHEN 'wacht_op_jou' THEN 0 WHEN 'open' THEN 1 ELSE 2 END, "
+        f"t.updated_at DESC LIMIT ? OFFSET ?", tuple(params + [PAGE_SIZE, (page - 1) * PAGE_SIZE]))
+    pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+    return render(request, "tickets.html", rows=rows, status=status if status in TICKET_FILTERS else "open",
+                  q=q, page=page, pages=pages, total=total, counts=tickets.counts(), enabled=tickets.enabled(),
+                  icons=tickets.STATUS_ICON, labels=tickets.STATUS_LABEL, active="tickets")
+
+
+@app.get("/tickets/{ticket_id}", response_class=HTMLResponse)
+async def ticket_detail(request: Request, ticket_id: int):
+    require_ready(request)
+    t = tickets.get(ticket_id)
+    if t is None:
+        raise HTTPException(404, "Ticket niet gevonden")
+    rows = db.query("SELECT * FROM conversations WHERE ticket_id=? ORDER BY id", (ticket_id,))
+    link = (f"https://discord.com/channels/{t['guild_id']}/{t['thread_id']}"
+            if t["guild_id"] and t["thread_id"] else None)
+    return render(request, "ticket.html", t=t, rows=rows, link=link, icons=tickets.STATUS_ICON,
+                  labels=tickets.STATUS_LABEL, active="tickets")
+
+
+@app.post("/tickets/{ticket_id}/{action}")
+async def ticket_action(request: Request, ticket_id: int, action: str):
+    sess = require_ready(request)
+    await check_csrf(request, sess)
+    if tickets.get(ticket_id) is None:
+        raise HTTPException(404)
+    if action == "sluiten":
+        await manager.close_ticket(ticket_id)
+        m = "gesloten"
+    elif action == "heropenen":
+        await manager.reopen_ticket(ticket_id)
+        m = "heropend"
+    else:
+        raise HTTPException(404)
+    return RedirectResponse(f"/tickets/{ticket_id}?m={m}", 303)
 
 
 @app.get("/afbeeldingen/{name}")
@@ -497,6 +572,13 @@ async def instellingen_algemeen(request: Request):
             settings.set(key, max(lo, min(hi, int(str(form.get(key) or settings.get(key))))))
         except ValueError:
             pass
+    if form.get("ticket_mode") in ("uit", "openbaar", "prive"):
+        settings.set("ticket_mode", form.get("ticket_mode"))
+    try:
+        settings.set("ticket_followup_minutes", max(0, min(240, int(str(form.get("ticket_followup_minutes"))))))
+    except ValueError:
+        pass
+    settings.set("ticket_ai_titles", form.get("ticket_ai_titles") == "1")
     if form.get("memory_mode") in ("auto", "review"):
         settings.set("memory_mode", form.get("memory_mode"))
     extra = [w.strip() for w in str(form.get("sensitive_extra") or "").splitlines() if w.strip()]

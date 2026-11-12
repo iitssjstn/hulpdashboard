@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}{{ t.title }} · Tickets{% endblock %}
+{% block content %}
+<p><a href="/tickets">← Alle tickets</a></p>
+<div class="row between">
+  <h1>{{ icons[t.status] }} {{ t.title }}</h1>
+  <span class="pill {{ 'pill-warn' if t.status == 'wacht_op_jou' else ('pill-ok' if t.status == 'opgelost' else '') }}">{{ labels[t.status] }}</span>
+</div>
+<p class="muted">#{{ t.id }} · {{ t.user_name }} · geopend {{ t.created_at|tijd }} · bijgewerkt {{ t.updated_at|tijd }}{% if t.closed_at %} · afgesloten {{ t.closed_at|tijd }}{% endif %}</p>
+
+<div class="row">
+  {% if link %}<a class="btn primary-link" href="{{ link }}" target="_blank" rel="noopener">💬 Open in Discord</a>{% endif %}
+  {% if t.status != 'opgelost' %}
+  <form method="post" action="/tickets/{{ t.id }}/sluiten"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="primary">✅ Afsluiten</button></form>
+  {% else %}
+  <form method="post" action="/tickets/{{ t.id }}/heropenen"><input type="hidden" name="csrf" value="{{ csrf }}"><button>↺ Heropenen</button></form>
+  {% endif %}
+</div>
+
+{% if t.summary %}
+<section class="card summary-card">
+  <h2>Samenvatting voor jou</h2>
+  <p>{{ t.summary }}</p>
+  {% if t.escalation_reason %}<p class="muted">{{ t.escalation_reason }}</p>{% endif %}
+</section>
+{% endif %}
+
+<h2>Gesprek</h2>
+{% set hide_ticket = True %}
+{% for r in rows %}{% include "_convo.html" %}{% else %}<div class="card muted">Nog geen berichten.</div>{% endfor %}
+{% endblock %}

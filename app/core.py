@@ -32,6 +32,7 @@ class Reply:
     status: str = "ok"  # ok | doorverwezen | fout | commando
     mention_owner: bool = False
     conversation_id: int | None = None
+    topic: str | None = None  # bij een gevoelig onderwerp: welke groep
 
 
 @dataclass
@@ -138,18 +139,26 @@ def save_images(images: list[IncomingImage]) -> list[SavedImage]:
 
 # ---------- gespreksgeschiedenis ----------
 
-def history_messages(user_id: str) -> list[dict]:
-    n = settings.get_int("history_messages", 0, 50)
-    hours = settings.get_int("history_hours", 1, 24 * 30)
-    if n == 0:
-        return []
-    since = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat(timespec="seconds")
-    rows = db.query(
-        "SELECT question, answer, images FROM conversations "
-        "WHERE user_id=? AND status IN ('ok','doorverwezen') AND created_at >= ? "
-        "ORDER BY id DESC LIMIT ?",
-        (user_id, since, n),
-    )
+def history_messages(user_id: str, ticket_id: int | None = None) -> list[dict]:
+    """Eerdere berichten als context. Met een ticket: dat hele gesprek (tot 30), anders per gebruiker."""
+    if ticket_id is not None:
+        rows = db.query(
+            "SELECT question, answer, images FROM conversations "
+            "WHERE ticket_id=? AND status IN ('ok','doorverwezen') ORDER BY id DESC LIMIT 30",
+            (ticket_id,),
+        )
+    else:
+        n = settings.get_int("history_messages", 0, 50)
+        hours = settings.get_int("history_hours", 1, 24 * 30)
+        if n == 0:
+            return []
+        since = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat(timespec="seconds")
+        rows = db.query(
+            "SELECT question, answer, images FROM conversations "
+            "WHERE user_id=? AND status IN ('ok','doorverwezen') AND created_at >= ? "
+            "ORDER BY id DESC LIMIT ?",
+            (user_id, since, n),
+        )
     out: list[dict] = []
     for r in reversed(rows):
         q = r["question"]
@@ -170,17 +179,17 @@ def _clean_question(text: str) -> str:
 
 def _store(user_id: str, user_name: str, channel_id: str | None, question: str, answer: str,
            images: list[str], model: str | None, status: str, error: str | None = None,
-           memory_checked: int = 0) -> int:
+           memory_checked: int = 0, ticket_id: int | None = None) -> int:
     return db.insert(
         "INSERT INTO conversations (created_at, user_id, user_name, channel_id, question, answer, images, "
-        "model, status, error, memory_checked) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        "model, status, error, memory_checked, ticket_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
         (db.now(), user_id, user_name, channel_id, question, answer, json.dumps(images), model,
-         status, error, memory_checked),
+         status, error, memory_checked, ticket_id),
     )
 
 
 async def answer_question(user_id: str, user_name: str, channel_id: str | None, text: str,
-                          images: list[IncomingImage] | None = None) -> Reply:
+                          images: list[IncomingImage] | None = None, ticket_id: int | None = None) -> Reply:
     raw = _clean_question(text)
     question = sensitive.redact(raw)
     images = images or []
@@ -191,8 +200,8 @@ async def answer_question(user_id: str, user_name: str, channel_id: str | None, 
         answer = referral_reply()
         saved = await asyncio.to_thread(save_images, images) if images else []
         cid = _store(user_id, user_name, channel_id, question, answer, [s.filename for s in saved],
-                     None, "doorverwezen", f"gevoelig onderwerp: {topic}", memory_checked=1)
-        return Reply(answer, "doorverwezen", True, cid)
+                     None, "doorverwezen", f"gevoelig onderwerp: {topic}", memory_checked=1, ticket_id=ticket_id)
+        return Reply(answer, "doorverwezen", True, cid, topic=topic)
 
     if not question and not images:
         return Reply("Hoi! Waar kan ik je mee helpen? Je mag ook een foto of schermafbeelding sturen.",
@@ -211,7 +220,7 @@ async def answer_question(user_id: str, user_name: str, channel_id: str | None, 
         content = question
 
     messages = [{"role": "system", "content": prompt.build_system_prompt()}]
-    messages += history_messages(user_id)
+    messages += history_messages(user_id, ticket_id)
     messages.append({"role": "user", "content": content})
 
     try:
@@ -220,13 +229,13 @@ async def answer_question(user_id: str, user_name: str, channel_id: str | None, 
         log.error("AI-fout (%s): %s | %s", exc.kind, exc.detail, " ; ".join(exc.attempts)[:1500])
         answer = friendly_error(exc.kind)
         cid = _store(user_id, user_name, channel_id, question, answer, [s.filename for s in saved],
-                     None, "fout", f"{exc.detail}: {' ; '.join(exc.attempts)}"[:2000], memory_checked=1)
+                     None, "fout", f"{exc.detail}: {' ; '.join(exc.attempts)}"[:2000], memory_checked=1, ticket_id=ticket_id)
         return Reply(answer, "fout", False, cid)
     except Exception as exc:  # noqa: BLE001 - nooit een stacktrace naar vader
         log.exception("Onverwachte fout bij beantwoorden")
         answer = friendly_error("other")
         cid = _store(user_id, user_name, channel_id, question, answer, [s.filename for s in saved],
-                     None, "fout", f"{type(exc).__name__}: {exc}"[:2000], memory_checked=1)
+                     None, "fout", f"{type(exc).__name__}: {exc}"[:2000], memory_checked=1, ticket_id=ticket_id)
         return Reply(answer, "fout", False, cid)
 
     if result.attempts:
@@ -240,7 +249,7 @@ async def answer_question(user_id: str, user_name: str, channel_id: str | None, 
         answer = f"{answer}\n\n{referral_line()}".strip()
         status, mention = "doorverwezen", True
     cid = _store(user_id, user_name, channel_id, question, answer, [s.filename for s in saved],
-                 result.model, status, memory_checked=1 if status == "doorverwezen" else 0)
+                 result.model, status, memory_checked=1 if status == "doorverwezen" else 0, ticket_id=ticket_id)
     return Reply(answer, status, mention, cid)
 
 

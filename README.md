@@ -56,16 +56,18 @@ bericht opnieuw uit de database, dus wijzigingen werken meteen.
 
 **Een vraag van pa, stap voor stap:**
 
-1. Hij typt in `#hulp` (of in een draadje daarin), eventueel met een afbeelding.
+1. Hij typt in `#hulp`, eventueel met een afbeelding. De bot maakt er een **ticket** van: een eigen
+   draadje onder zijn vraag, met een korte titel (bijv. "🟡 Tv geeft geen geluid"). Zie [Tickets](#tickets).
 2. Wachtwoorden, pincodes, IBANs, kaartnummers en Twitch-streamsleutels worden uit de tekst gepoetst
    voordat er iets wordt opgeslagen of naar het model gaat. Foto's worden verkleind en EXIF-gegevens
    (zoals GPS-locatie) worden verwijderd.
 3. Gaat het over **betalen, bankzaken, wachtwoorden, verdachte mails/sms'jes of abonnementen
    opzeggen**? Dan stuurt de bot de vraag níét naar het model, maar antwoordt: *"Klik voorlopig nergens op
    … @jij kun je hier even naar kijken?"*. Het model kan dit ook zelf signaleren (bijv. bij een
-   screenshot van een verdachte mail).
-4. Anders gaat de vraag, met de systeemprompt, zijn profiel, de onthouden feiten en de laatste ~10
-   berichten, naar OpenRouter. Lukt het eerste model niet (fout, rate limit, leeg antwoord), dan
+   screenshot van een verdachte mail). Jij krijgt dan een melding met een **samenvatting** in je eigen
+   privékanaal (zie [Meldingen voor jou](#meldingen-voor-jou)).
+4. Anders gaat de vraag, met de systeemprompt, zijn profiel, de onthouden feiten en het gesprek in dit
+   ticket, naar OpenRouter. Lukt het eerste model niet (fout, rate limit, leeg antwoord), dan
    probeert de bot automatisch het volgende model in de lijst. Tijdens het nadenken zie je "typing…".
 5. Na een paar minuten stilte vraagt de bot het model (met een kort extra verzoek) of er een nieuw,
    blijvend feit in het gesprek zat. Nieuwe feiten verschijnen in `#geheugen`: direct opgeslagen, of
@@ -176,7 +178,15 @@ image bekijken.
 3. **Uitnodigen:** klik in de wizard (of bij Instellingen) op **Test** naast het token. Je krijgt dan een
    link "Bot uitnodigen op je server" met precies de juiste rechten:
    kanalen bekijken, berichten sturen (ook in draadjes), berichtgeschiedenis lezen, links insluiten,
-   reacties toevoegen en berichten beheren (om de ✅/❌-reacties in `#geheugen` op te ruimen).
+   reacties toevoegen, berichten beheren (om de ✅/❌-reacties in `#geheugen` op te ruimen),
+   openbare en privé-draadjes maken, draadjes beheren (titel en status van tickets aanpassen) en
+   kanalen beheren (om eenmalig jouw privé-meldingskanaal aan te maken).
+
+   > **Bot al eerder uitgenodigd?** Sinds de tickets heeft hij meer rechten nodig. Open de nieuwe
+   > uitnodigingslink (via **Test** bij Instellingen) en kies dezelfde server: Discord werkt dan alleen
+   > de rechten bij. Mist er een recht, dan antwoordt de bot gewoon in `#hulp` zelf (zonder draadje) en
+   > tagt hij je in het gesprek zelf in plaats van in je meldingskanaal. Op de Status-pagina zie je
+   > dan een waarschuwing.
 
    Handmatig kan ook: **OAuth2** → **URL Generator** → scope `bot` → de rechten hierboven.
 4. Maak in je server de kanalen `#hulp` en `#geheugen` aan. Geef de bot toegang tot beide. Maak
@@ -422,7 +432,60 @@ invullen in het dashboard.
 
 ## Gebruik in Discord
 
-In `#hulp` (en draadjes daarin) gewoon een vraag typen of een afbeelding plakken. Commando's:
+### Tickets
+
+Elke nieuwe vraag in `#hulp` wordt een **ticket**: een eigen draadje onder zijn bericht. Zo lopen
+problemen niet door elkaar, en de bot onthoudt binnen een ticket het hele gesprek (en niets van andere
+tickets).
+
+- **Titel:** de bot laat het AI-model een korte titel bedenken (bijv. "OBS: camera blijft zwart"). Dat
+  kost één extra verzoek per ticket; zonder AI-titels pakt hij de eerste woorden van de vraag. Bij
+  gevoelige onderwerpen gaat er niets naar het model en wordt de titel bijv. "Vraag over betalen of
+  bankzaken".
+- **Status in de titel:** 🟡 open · 🙋 wacht op jou · ✅ opgelost.
+- **Knoppen onder elk antwoord:** **✅ Opgelost** (sluit het ticket en archiveert het draadje) en
+  **🙋 Vraag &lt;jouw naam&gt;** (haalt jou erbij). Alleen je vader en jij kunnen ze gebruiken. Ze blijven
+  werken na een herstart.
+- **Typt hij later weer in een gesloten draadje**, dan gaat het ticket vanzelf weer open.
+- **Typt hij in `#hulp` zelf terwijl hij net een open ticket heeft** (standaard binnen 15 minuten), dan
+  ziet de bot dat als vervolg: hij antwoordt in het bestaande draadje en zet in `#hulp` een linkje
+  "Ik ga verder in ons gesprek hierover".
+- **Privé-draadjes:** bij Instellingen kun je kiezen voor privé-draadjes die alleen hij, jij en de bot
+  zien. Handig als er meer mensen in je server zitten.
+- **Opgelost = geheugen:** zodra een ticket is opgelost, kijkt de bot meteen of er een blijvend feit in
+  zat (bijv. "Geluid van de tv opgelost door de soundbar op HDMI-ARC te zetten").
+- **Dashboard → Tickets:** alle tickets met de filters Open / Wacht op jou / Opgelost, zoeken, het hele
+  gesprek, een knop naar Discord, en sluiten of heropenen (dat wordt ook in Discord bijgewerkt). In het
+  menu staat een rood getal als er tickets op jou wachten.
+
+Tickets uit? Kies "Uit" bij **Instellingen → Tickets**: dan werkt alles zoals in een gewoon kanaal, en
+onthoudt de bot de laatste berichten per persoon.
+
+### Meldingen voor jou
+
+Als de bot jou erbij haalt (gevoelig onderwerp, het model vindt het iets voor jou, of je vader klikt op
+**🙋 Vraag …**), krijg je een melding in een **privékanaal dat alleen jij en de bot zien**. De bot maakt
+het de eerste keer zelf aan (`#voor-<jouw naam>`, in dezelfde categorie als `#hulp`). Wil je een eigen
+kanaal gebruiken, vul dan het ID in bij **Instellingen → Discord → Kanaal-ID meldingen**.
+
+Elke melding bevat:
+
+- **een korte samenvatting** van 2-3 zinnen: wat het probleem is, wat er al is geprobeerd en waarom
+  jij nodig bent, zodat je het gesprek niet hoeft terug te lezen
+- **het onderwerp** (de tickettitel) en **waarom jij** erbij gehaald wordt
+- de knop **💬 Open gesprek**, die je direct naar het draadje brengt (bij privé-draadjes voegt de bot je
+  er automatisch aan toe)
+- de knop **✅ Afgehandeld**, die het ticket sluit, je vader laat weten dat het geregeld is, en de
+  melding groen maakt
+
+**Privacy bij gevoelige onderwerpen:** over betalen, wachtwoorden en dergelijke maakt de bot **geen**
+AI-samenvatting, want die vragen gaan bewust niet naar het model. Je krijgt dan de categorie en zijn
+laatste bericht (met eventuele codes, IBANs en dergelijke weggepoetst). Kan het meldingskanaal niet
+gemaakt worden (recht ontbreekt), dan tagt de bot je in het draadje zelf.
+
+### Commando's
+
+Gewoon een vraag typen of een afbeelding plakken. Commando's werken in `#hulp` en in draadjes:
 
 | Commando | Wat het doet |
 |---|---|
@@ -475,6 +538,7 @@ HULP_DATA_DIR=./data HULP_KEY_DIR=./keys python -m app
 │   ├── main.py            # FastAPI-routes: wizard, pagina's, API voor Test-knoppen
 │   ├── bot.py             # Discord-laag + BotManager (opnieuw verbinden, status, health)
 │   ├── core.py            # bot-logica zonder Discord: antwoorden, commando's, geheugen
+│   ├── tickets.py         # tickets: titels, status, vervolgvragen, samenvatting voor de eigenaar
 │   ├── ai.py              # OpenRouter-client met fallback, key-test, modellijst
 │   ├── prompt.py          # standaard-systeemprompt + profiel + feiten
 │   ├── memory.py          # feiten opslaan, inkorten voor de prompt, extractie-prompt

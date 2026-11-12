@@ -26,9 +26,26 @@
   </section>
 
   <section class="card">
+    <h2>Tickets</h2>
+    <p class="muted">Elke nieuwe vraag in #hulp krijgt een eigen draadje met knoppen <em>✅ Opgelost</em> en <em>🙋 Vraag …</em>. Zo lopen problemen niet door elkaar.</p>
+    <div class="grid2">
+      <label>Tickets
+        <select name="ticket_mode">
+          <option value="openbaar" {{ 'selected' if s.ticket_mode == 'openbaar' }}>Aan: draadje onder zijn vraag</option>
+          <option value="prive" {{ 'selected' if s.ticket_mode == 'prive' }}>Aan: privé-draadje (alleen hij, jij en de bot)</option>
+          <option value="uit" {{ 'selected' if s.ticket_mode == 'uit' }}>Uit: alles in #hulp zelf</option>
+        </select></label>
+      <label>Nieuw bericht in #hulp binnen … minuten hoort bij zijn open ticket
+        <input type="number" name="ticket_followup_minutes" min="0" max="240" value="{{ s.ticket_followup_minutes }}">
+        <span class="muted">0 = elk bericht in #hulp wordt een nieuw ticket</span></label>
+    </div>
+    <label class="check"><input type="checkbox" name="ticket_ai_titles" value="1" {{ 'checked' if s.ticket_ai_titles }}> Titels laten bedenken door het AI-model <span class="muted">(kost 1 extra verzoek per ticket; anders de eerste woorden van zijn vraag)</span></label>
+  </section>
+
+  <section class="card">
     <h2>Gesprekken en geheugen</h2>
     <div class="grid2">
-      <label>Aantal onthouden berichten per gebruiker <span class="muted">(vraag + antwoord)</span>
+      <label>Aantal onthouden berichten per gebruiker <span class="muted">(vraag + antwoord; alleen als tickets uit staan, anders onthoudt hij het hele ticket)</span>
         <input type="number" name="history_messages" min="0" max="50" value="{{ s.history_messages }}"></label>
       <label>…maar alleen van de laatste (uur)
         <input type="number" name="history_hours" min="1" max="720" value="{{ s.history_hours }}"></label>

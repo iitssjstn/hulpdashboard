@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Tickets · Hulpdashboard{% endblock %}
+{% block content %}
+<h1>Tickets</h1>
+{% if not enabled %}<div class="flash flash-fout">Tickets staan uit. Zet ze aan bij <a href="/instellingen">Instellingen</a>.</div>{% endif %}
+<nav class="tabs">
+  <a href="?status=open" class="{{ 'on' if status == 'open' }}">Open <span class="count">{{ counts.open + counts.wacht_op_jou }}</span></a>
+  <a href="?status=wacht_op_jou" class="{{ 'on' if status == 'wacht_op_jou' }}">🙋 Wacht op jou <span class="count">{{ counts.wacht_op_jou }}</span></a>
+  <a href="?status=opgelost" class="{{ 'on' if status == 'opgelost' }}">✅ Opgelost <span class="count">{{ counts.opgelost }}</span></a>
+  <a href="?status=alle" class="{{ 'on' if status == 'alle' }}">Alle</a>
+</nav>
+<form method="get" action="/tickets" class="row search">
+  <input type="hidden" name="status" value="{{ status }}">
+  <input type="search" name="q" value="{{ q }}" placeholder="Zoek in titels en gesprekken…">
+  <button>Zoeken</button>
+  {% if q %}<a href="?status={{ status }}" class="ghost btn">Wissen</a>{% endif %}
+</form>
+
+{% for t in rows %}
+<a class="card ticket-row status-{{ t.status }}" href="/tickets/{{ t.id }}">
+  <span class="ticket-icon" aria-hidden="true">{{ icons[t.status] }}</span>
+  <span class="ticket-main">
+    <strong>{{ t.title }}</strong>
+    {% if t.status == 'wacht_op_jou' and t.summary %}<span class="ticket-summary">{{ t.summary }}</span>
+    {% elif t.first_q %}<span class="muted ticket-summary">{{ t.first_q }}</span>{% endif %}
+    <span class="meta muted">#{{ t.id }} · {{ t.user_name }} · {{ t.n_msgs }} bericht{{ 'en' if t.n_msgs != 1 }} · bijgewerkt {{ t.updated_at|tijd }}</span>
+  </span>
+  <span class="pill {{ 'pill-warn' if t.status == 'wacht_op_jou' else ('pill-ok' if t.status == 'opgelost' else '') }}">{{ labels[t.status] }}</span>
+</a>
+{% else %}
+<div class="card muted">Geen tickets{% if q %} gevonden voor “{{ q }}”{% endif %}.</div>
+{% endfor %}
+
+{% if pages > 1 %}
+<nav class="pager">
+  {% if page > 1 %}<a href="?status={{ status }}&q={{ q|urlencode }}&page={{ page - 1 }}">← Nieuwer</a>{% endif %}
+  <span>pagina {{ page }} van {{ pages }}</span>
+  {% if page < pages %}<a href="?status={{ status }}&q={{ q|urlencode }}&page={{ page + 1 }}">Ouder →</a>{% endif %}
+</nav>
+{% endif %}
+{% endblock %}

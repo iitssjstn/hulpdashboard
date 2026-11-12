@@ -7,9 +7,11 @@ API = "https://discord.com/api/v10"
 FLAG_MESSAGE_CONTENT = 1 << 18
 FLAG_MESSAGE_CONTENT_LIMITED = 1 << 19
 
-# Bekijken, berichten sturen (ook in draadjes), geschiedenis lezen, links insluiten,
-# reacties toevoegen en berichten beheren (om reacties in #geheugen op te ruimen).
-PERMISSIONS = 1024 + 2048 + 274877906944 + 65536 + 16384 + 64 + 8192
+# Bekijken, berichten sturen (ook in draadjes), geschiedenis lezen, links insluiten, reacties
+# toevoegen, berichten beheren (reacties in #geheugen opruimen), openbare en privé-draadjes maken,
+# draadjes beheren (titel/status aanpassen) en kanalen beheren (het meldingskanaal voor jou aanmaken).
+PERMISSIONS = (1024 + 2048 + 274877906944 + 65536 + 16384 + 64 + 8192
+               + 34359738368 + 68719476736 + 17179869184 + 16)
 
 
 def invite_url(app_id: str) -> str:
